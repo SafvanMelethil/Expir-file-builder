@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{margin:0}</style>
+</head>
+<body>
+<title>Expiry File Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#F2F5F4; --surface:#FFFFFF; --surface-2:#F7F9F8; --ink:#14201D; --muted:#5A6B66; --line:#D8E0DD; --line-2:#E8EDEB;
+  --accent:#0C6B5B; --accent-ink:#FFFFFF; --accent-soft:#E2F1ED;
+  --ok:#1D7A3E; --ok-soft:#E3F3E8; --warn:#9A5B00; --warn-soft:#FBEFD9; --info:#2A5B9C; --info-soft:#E4EDF9; --bad:#B0261C; --bad-soft:#FBE6E3;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --r:8px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;
+  --bg:#0F1614; --surface:#16201D; --surface-2:#1B2724; --ink:#E4ECE9; --muted:#93A5A0; --line:#2B3A36; --line-2:#22302C;
+  --accent:#3FB39C; --accent-ink:#06201A; --accent-soft:#16332D;
+  --ok:#5CC981; --ok-soft:#153324; --warn:#E3A745; --warn-soft:#352812; --info:#7FA9E6; --info-soft:#18263A; --bad:#F07C70; --bad-soft:#3A1916;
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0F1614; --surface:#16201D; --surface-2:#1B2724; --ink:#E4ECE9; --muted:#93A5A0; --line:#2B3A36; --line-2:#22302C;
+  --accent:#3FB39C; --accent-ink:#06201A; --accent-soft:#16332D;
+  --ok:#5CC981; --ok-soft:#153324; --warn:#E3A745; --warn-soft:#352812; --info:#7FA9E6; --info-soft:#18263A; --bad:#F07C70; --bad-soft:#3A1916;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding:24px 20px 60px;display:flex;flex-direction:column;gap:18px}
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:2px 0 0;font-size:13px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.p-ok{background:var(--ok-soft);color:var(--ok)} .p-warn{background:var(--warn-soft);color:var(--warn)}
+.p-info{background:var(--info-soft);color:var(--info)} .p-bad{background:var(--bad-soft);color:var(--bad)}
+.p-mute{background:var(--line-2);color:var(--muted)}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:820px){.steps{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card h2{font-size:15px;margin:0;display:flex;align-items:center;gap:10px}
+.num{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:700;flex:none}
+.card.locked{opacity:.55;pointer-events:none}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:18px;text-align:center;background:var(--surface-2);cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.drop strong{display:block;font-size:14px}
+.drop span{color:var(--muted);font-size:12.5px}
+.facts{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted)}
+.facts b{color:var(--ink);font-weight:600}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+button,.btn{font:inherit;font-weight:600;font-size:13px;border-radius:6px;padding:8px 14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.primary:hover{filter:brightness(1.08)}
+button.danger{color:var(--bad)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.link{border:none;background:none;padding:2px 4px;color:var(--accent)}
+label.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
+input[type=text]{font:inherit;font-family:var(--mono);font-size:13px;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);width:130px}
+input[type=text]:focus{outline:2px solid var(--accent);outline-offset:0}
+.cols{display:flex;flex-wrap:wrap;gap:6px}
+.col{font-size:12px;border-radius:4px;padding:2px 8px;border:1px solid var(--line);font-family:var(--mono)}
+.col.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+.col.miss{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent);background:var(--bad-soft)}
+.verdict{border-radius:var(--r);padding:14px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;border:1px solid}
+.verdict.ok{background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 30%,transparent);color:var(--ok)}
+.verdict.warn{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 30%,transparent);color:var(--warn)}
+.verdict.bad{background:var(--bad-soft);border-color:color-mix(in srgb,var(--bad) 30%,transparent);color:var(--bad)}
+.verdict h3{margin:0;font-size:16px}
+.verdict p{margin:0;color:var(--ink);font-size:13px}
+.verdict .grow{flex:1;min-width:220px;display:flex;flex-direction:column;gap:2px}
+.tally{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+@media (max-width:820px){.tally{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tile{border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:var(--surface);cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:2px;font-weight:400}
+.tile.active{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.tile .n{font-size:20px;font-weight:700;font-family:var(--mono)}
+.tile .l{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.tile.ok .n{color:var(--ok)} .tile.warn .n{color:var(--warn)} .tile.info .n{color:var(--info)} .tile.bad .n{color:var(--bad)}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;padding:9px 10px;background:var(--surface-2);border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
+td{padding:8px 10px;border-bottom:1px solid var(--line-2);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.r,th.r{text-align:right}
+td.desc{max-width:260px;color:var(--muted)}
+td.msg{min-width:260px}
+tr.sev-bad td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
+tr.sev-warn td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+tr.sev-info td:first-child{box-shadow:inset 3px 0 0 var(--info)}
+tr.sev-ok td:first-child{box-shadow:inset 3px 0 0 var(--ok)}
+.alts{margin:4px 0 0;padding:0;list-style:none;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.alts li b{color:var(--ink);font-weight:500}
+pre.txt{margin:0;max-height:320px;overflow:auto;font-family:var(--mono);font-size:12px;line-height:1.55;padding:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;white-space:pre;tab-size:4}
+.notice{font-size:13px;padding:10px 12px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line)}
+.notice.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+.notice.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.confirm{border:1px solid var(--warn);background:var(--warn-soft);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.confirm p{margin:0;color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;font-weight:600;font-size:13px;z-index:10;max-width:calc(100% - 32px)}
+details summary{cursor:pointer;font-weight:600;font-size:13px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;padding:10px 14px;color:var(--muted);display:inline-flex;gap:8px;align-items:center}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs button:hover{border-color:transparent;border-bottom-color:var(--line);color:var(--ink)}
+.tabs button[aria-selected="true"]:hover{border-bottom-color:var(--accent)}
+.badge{font-family:var(--mono);font-size:11px;border-radius:999px;padding:1px 7px;background:var(--line-2);color:var(--muted)}
+.badge.hot{background:var(--warn-soft);color:var(--warn)}
+.panel{display:flex;flex-direction:column;gap:18px}
+.route{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+.route .arr{color:var(--muted);padding:0 4px}
+.tablebox.tall{max-height:520px;overflow:auto}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Expiry File Builder</h1>
+      <p class="sub" id="subLine">Plant 1200 (Jeddah) / 2200 (Riyadh) · expiry return TXT and overstock transfer Excel</p>
+    </div>
+    <div class="row" id="sessionPill"><span class="pill p-mute">SAP stock not loaded</span></div>
+  </header>
+
+  <div class="card" id="stockCard">
+      <h2><span class="num">1</span> SAP stock file <span class="muted" style="font-weight:500">1200 or 2200</span></h2>
+      <div class="drop" id="stockDrop" tabindex="0" role="button" aria-label="Upload SAP stock Excel">
+        <strong>Upload 1200.xlsx or 2200.xlsx</strong>
+        <span>Loaded once per session. Quantities you export are deducted until you close the page.</span>
+      </div>
+      <input type="file" id="stockInput" accept=".xlsx,.xls,.xlsb,.csv" hidden>
+      <div id="stockInfo"></div>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tabExpBtn" aria-selected="true" data-tab="exp">Expiry return TXT</button>
+    <button role="tab" id="tabOsBtn" aria-selected="false" data-tab="os">Overstock transfer <span class="badge" id="osBadge">–</span></button>
+  </nav>
+
+  <div class="panel" id="tabExp">
+    <div class="card locked" id="retCard">
+      <h2><span class="num">2</span> Return / expiry Excel</h2>
+      <div class="drop" id="retDrop" tabindex="0" role="button" aria-label="Upload return Excel">
+        <strong>Upload return Excel</strong>
+        <span>Needs: Material, Plant, Storage Location, Batch, Quantity, Supplier, Cost Price</span>
+      </div>
+      <input type="file" id="retInput" accept=".xlsx,.xls,.xlsb,.csv" hidden>
+      <div class="row">
+        <label class="fld" for="postDate">Document date
+          <input type="text" id="postDate" placeholder="dd.mm.yyyy">
+        </label>
+      </div>
+      <div id="retInfo"></div>
+    </div>
+    <section id="results" hidden></section>
+  </div>
+
+  <div class="panel" id="tabOs" hidden>
+    <section class="card" id="osCard"><p class="muted">Upload the SAP stock file first. Overstock in storage locations x204 and x208 will be listed here.</p></section>
+  </div>
+
+  <section class="card" id="logCard" hidden>
+    <h2>Session log</h2>
+    <div id="logBody"></div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="lib/xlsx.bundle.js"></script>
+<script>
+(function(){
+"use strict";
+const PLANTS = { "1200":"Jeddah", "2200":"Riyadh" };
+let VALID_PLANT = "1200";
+let VALID_SLOCS = slocsFor("1200");
+function slocsFor(pl){ const d = pl[0]; return [1,2,3,4,5,6,7,8].map(n => d+"20"+n); }
+function slocRange(){ return VALID_SLOCS[0]+"–"+VALID_SLOCS[7]; }
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtQ = n => { n = Math.round(n*1000)/1000; return Number.isInteger(n) ? String(n) : String(n); };
+
+/* ---------- session state (memory only) ---------- */
+const S = {
+  stock: null,        // Map mat -> Map sloc -> Map batchKey -> {batch, qty}
+  stockMeta: null,    // {file, rows, materials, desc: Map}
+  original: null,     // deep copy total for reference
+  current: null,      // current return file analysis
+  exports: [],        // [{file, time, lines, qty, deductions:[{mat,sloc,bk,qty}]}]
+};
+
+/* ---------- helpers ---------- */
+function normHead(h){ return String(h ?? "").toLowerCase().replace(/[^a-z0-9]/g,""); }
+function normMat(v){
+  if (v === null || v === undefined) return "";
+  if (typeof v === "number") return String(Math.round(v));
+  return String(v).trim().replace(/\.0+$/,"");
+}
+function normCode(v){
+  if (v === null || v === undefined) return "";
+  if (typeof v === "number") return String(Math.round(v));
+  return String(v).trim().replace(/\.0+$/,"");
+}
+function normBatch(v){ return normCode(v); }
+function bkey(b){ return String(b).toUpperCase(); }
+function toNum(v){
+  if (typeof v === "number") return v;
+  const s = String(v ?? "").replace(/,/g,"").trim();
+  if (s === "") return NaN;
+  return Number(s);
+}
+function todayStr(){
+  const d = new Date();
+  return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear();
+}
+function toast(msg){
+  const t = $("toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(()=>{ t.hidden = true; }, 3200);
+}
+
+/* Column finder: returns index map + list of missing required columns */
+const COLS = {
+  material: { label:"Material", test:h => h==="material" || h==="materialnumber" || h==="materialno" || h==="article" },
+  desc:     { label:"Material Description", optional:true, test:h => h==="materialdescription" || h==="description" },
+  plant:    { label:"Plant", test:h => h==="plant" },
+  sloc:     { label:"Storage Location", test:h => h==="storagelocation" || h==="sloc" || h==="stloc" },
+  batch:    { label:"Batch", test:h => h==="batch" || h==="batchno" || h==="batchnumber" },
+  qty:      { label:"Quantity", test:h => h==="quantity" || h==="qty" || (h.includes("quantity") && !h.includes("return")) },
+  supplier: { label:"Supplier", test:h => h==="supplier" || h==="vendor" || h==="suppliercode" || h==="vendorcode" },
+  cost:     { label:"Cost Price", test:h => h==="costprice" || h==="cost" || h==="unitcost" },
+};
+function findHeader(rows, need){
+  for (let r = 0; r < Math.min(rows.length, 15); r++){
+    const heads = rows[r].map(normHead);
+    const map = {};
+    for (const [k,def] of Object.entries(COLS)){
+      const i = heads.findIndex(def.test);
+      if (i >= 0) map[k] = i;
+    }
+    if (map.material !== undefined){
+      const missing = need.filter(k => map[k] === undefined);
+      return { row:r, map, missing, heads: rows[r] };
+    }
+  }
+  return { row:-1, map:{}, missing:need.slice(), heads:[] };
+}
+function readWorkbook(file){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onerror = () => rej(new Error("Could not read the file."));
+    fr.onload = () => {
+      try{
+        const wb = XLSX.read(new Uint8Array(fr.result), { type:"array", cellDates:true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:"", blankrows:false });
+        res(rows);
+      }catch(e){ rej(new Error("This file could not be opened as Excel.")); }
+    };
+    fr.readAsArrayBuffer(file);
+  });
+}
+function wireDrop(dropEl, inputEl, handler){
+  dropEl.addEventListener("click", () => inputEl.click());
+  dropEl.addEventListener("keydown", e => { if (e.key==="Enter"||e.key===" "){ e.preventDefault(); inputEl.click(); }});
+  inputEl.addEventListener("change", () => { if (inputEl.files[0]) handler(inputEl.files[0]); inputEl.value=""; });
+  dropEl.addEventListener("dragover", e => { e.preventDefault(); dropEl.classList.add("over"); });
+  dropEl.addEventListener("dragleave", () => dropEl.classList.remove("over"));
+  dropEl.addEventListener("drop", e => { e.preventDefault(); dropEl.classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) handler(f); });
+}
+
+/* ---------- stock ---------- */
+function getLot(mat, sloc, bk){
+  const m = S.stock.get(mat); if (!m) return null;
+  const s = m.get(sloc); if (!s) return null;
+  return s.get(bk) || null;
+}
+async function loadStock(file){
+  $("stockInfo").innerHTML = `<p class="muted small">Reading ${esc(file.name)}…</p>`;
+  let rows;
+  try{ rows = await readWorkbook(file); }catch(e){ $("stockInfo").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; return; }
+  const need = ["material","plant","sloc","batch","qty"];
+  const h = findHeader(rows, need);
+  if (h.row < 0 || h.missing.length){
+    $("stockInfo").innerHTML = `<div class="notice bad">This does not look like the SAP stock file. Missing column(s): <b>${h.missing.map(k=>COLS[k].label).join(", ")}</b>.</div>`;
+    return;
+  }
+  // detect plant (1200 Jeddah / 2200 Riyadh)
+  const pc = {};
+  for (let r = h.row+1; r < rows.length; r++){ const pl = normCode(rows[r][h.map.plant]); if (pl) pc[pl] = (pc[pl]||0)+1; }
+  const plant = Object.keys(pc).filter(k => PLANTS[k]).sort((a,b)=>pc[b]-pc[a])[0];
+  if (!plant){
+    $("stockInfo").innerHTML = `<div class="notice bad">No plant 1200 or 2200 rows found in ${esc(file.name)}. Plants in file: ${esc(Object.keys(pc).join(", ")||"none")}.</div>`;
+    return;
+  }
+  const stock = new Map(), desc = new Map();
+  let n = 0, skipped = 0;
+  for (let r = h.row+1; r < rows.length; r++){
+    const row = rows[r];
+    const mat = normMat(row[h.map.material]); if (!mat) continue;
+    const rowPlant = normCode(row[h.map.plant]);
+    if (rowPlant && rowPlant !== plant){ skipped++; continue; }
+    const sloc = normCode(row[h.map.sloc]);
+    const batch = normBatch(row[h.map.batch]);
+    const q = toNum(row[h.map.qty]); if (!isFinite(q)) continue;
+    if (!stock.has(mat)) stock.set(mat, new Map());
+    const m = stock.get(mat);
+    if (!m.has(sloc)) m.set(sloc, new Map());
+    const s = m.get(sloc); const bk = bkey(batch);
+    if (!s.has(bk)) s.set(bk, { batch, qty:0, orig:0 });
+    const lot = s.get(bk); lot.qty += q; lot.orig += q;
+    if (h.map.desc !== undefined && !desc.has(mat)) desc.set(mat, String(row[h.map.desc] ?? ""));
+    n++;
+  }
+  if (!n){ $("stockInfo").innerHTML = `<div class="notice bad">No stock rows found in ${esc(file.name)}.</div>`; return; }
+  VALID_PLANT = plant; VALID_SLOCS = slocsFor(plant);
+  S.stock = stock; S.exports = []; S.lastOS = null;
+  S.stockMeta = { file:file.name, plant, rows:n, materials:stock.size, desc, loadedAt:new Date(), skipped };
+  S.current = null;
+  $("results").hidden = true; $("results").innerHTML = "";
+  renderStock(); renderLog();
+  $("retCard").classList.remove("locked");
+  toast(`SAP stock loaded: ${n.toLocaleString()} rows`);
+}
+function renderStock(){
+  const m = S.stockMeta;
+  $("stockDrop").hidden = !!m;
+  if (!m){ $("stockInfo").innerHTML = ""; return; }
+  const used = S.exports.reduce((a,e)=>a+e.qty,0);
+  $("stockInfo").innerHTML = `
+    <div class="facts">
+      <span>Plant <b class="mono">${m.plant}</b> ${PLANTS[m.plant]}</span>
+      <span>File <b>${esc(m.file)}</b></span>
+      <span>Rows <b class="mono">${m.rows.toLocaleString()}</b></span>
+      <span>Materials <b class="mono">${m.materials.toLocaleString()}</b></span>
+      <span>Loaded <b class="mono">${m.loadedAt.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</b></span>
+      <span>Deducted this session <b class="mono">${fmtQ(used)}</b> pc</span>
+    </div>
+    ${m.skipped ? `<p class="small muted">${m.skipped} row(s) from other plants ignored.</p>` : ""}
+    <div class="row"><button class="danger" id="replaceStock">Replace stock file</button></div>`;
+  $("replaceStock").onclick = () => {
+    const box = $("stockInfo");
+    if (box.querySelector(".confirm")) return;
+    const c = document.createElement("div"); c.className = "confirm";
+    c.innerHTML = `<p>Replacing the stock file clears all deductions made this session. Continue?</p>
+      <div class="row"><button class="primary" id="rsYes">Choose new file</button><button id="rsNo">Cancel</button></div>`;
+    box.appendChild(c);
+    $("rsYes").onclick = () => { $("stockInput").click(); c.remove(); };
+    $("rsNo").onclick = () => c.remove();
+  };
+  $("sessionPill").innerHTML = `<span class="pill p-ok">Plant ${m.plant} ${PLANTS[m.plant]} · ${S.exports.length} file(s) exported</span>`;
+  renderOS();
+}
+
+/* ---------- return file ---------- */
+async function loadReturn(file){
+  if (!S.stock){ toast("Upload the SAP stock file first"); return; }
+  $("retInfo").innerHTML = `<p class="muted small">Reading ${esc(file.name)}…</p>`;
+  let rows;
+  try{ rows = await readWorkbook(file); }catch(e){ $("retInfo").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; return; }
+  const need = ["material","plant","sloc","batch","qty","supplier","cost"];
+  const h = findHeader(rows, need);
+  const colChips = need.map(k => `<span class="col ${h.map[k]!==undefined?"ok":"miss"}">${COLS[k].label}</span>`).join("");
+  if (h.row < 0 || h.missing.length){
+    $("retInfo").innerHTML = `<div class="cols">${colChips}</div>
+      <div class="notice bad">Cannot build the TXT. Missing column(s): <b>${h.missing.map(k=>COLS[k].label).join(", ")}</b>. Add them to ${esc(file.name)} and upload again.</div>`;
+    $("results").hidden = true; S.current = null; return;
+  }
+  const lines = [];
+  for (let r = h.row+1; r < rows.length; r++){
+    const row = rows[r];
+    const mat = normMat(row[h.map.material]);
+    const qRaw = row[h.map.qty];
+    if (!mat && (qRaw === "" || qRaw === null)) continue;
+    const L = {
+      excelRow: r+1, mat,
+      desc: h.map.desc !== undefined ? String(row[h.map.desc] ?? "") : (S.stockMeta.desc.get(mat) || ""),
+      plant: normCode(row[h.map.plant]),
+      sloc: normCode(row[h.map.sloc]),
+      batch: normBatch(row[h.map.batch]),
+      qty: toNum(qRaw),
+      supplier: normCode(row[h.map.supplier]),
+      cost: toNum(row[h.map.cost]),
+      errors: [],
+    };
+    if (!/^[1-5]\d*$/.test(L.mat)) L.errors.push("Material must be numeric and start with 1–5");
+    if (L.plant !== VALID_PLANT) L.errors.push(`Plant is "${L.plant||"blank"}", expected ${VALID_PLANT} (loaded stock file)`);
+    if (!VALID_SLOCS.includes(L.sloc)) L.errors.push(`Storage location "${L.sloc||"blank"}" is not ${slocRange()}`);
+    if (!L.batch) L.errors.push("Batch is blank");
+    if (!isFinite(L.qty) || L.qty <= 0) L.errors.push("Quantity must be a number above 0");
+    if (!L.supplier) L.errors.push("Supplier is blank");
+    if (!isFinite(L.cost) || L.cost < 0) L.errors.push("Cost price is missing or not a number");
+    lines.push(L);
+  }
+  if (!lines.length){
+    $("retInfo").innerHTML = `<div class="cols">${colChips}</div><div class="notice bad">No data rows found in ${esc(file.name)}.</div>`;
+    return;
+  }
+  const already = S.exports.some(e => e.source === file.name);
+  S.current = { file:file.name, lines, header:h, already };
+  $("retInfo").innerHTML = `<div class="cols">${colChips}</div>
+    <div class="facts"><span>File <b>${esc(file.name)}</b></span><span>Lines <b class="mono">${lines.length}</b></span></div>
+    ${already ? `<div class="notice warn">${esc(file.name)} was already exported in this session. Its quantities are already deducted from stock.</div>`:""}`;
+  analyse(); renderResults();
+}
+
+/* ---------- validation ---------- */
+function analyse(){
+  const C = S.current;
+  const groups = new Map(); // key mat|sloc|bk
+  for (const L of C.lines){
+    if (L.errors.length) continue;
+    const k = L.mat+"|"+L.sloc+"|"+bkey(L.batch);
+    if (!groups.has(k)) groups.set(k, { key:k, mat:L.mat, desc:L.desc, sloc:L.sloc, batch:L.batch, bk:bkey(L.batch), qty:0, rows:[] });
+    const g = groups.get(k); g.qty += L.qty; g.rows.push(L.excelRow);
+  }
+  // pool of what is left per material, lot by lot (only valid slocs)
+  const pools = new Map();
+  const poolFor = mat => {
+    if (pools.has(mat)) return pools.get(mat);
+    const m = S.stock.get(mat); const lots = [];
+    if (m) for (const [sloc, s] of m) if (VALID_SLOCS.includes(sloc)) for (const [bk, lot] of s) lots.push({ sloc, bk, batch:lot.batch, left:Math.max(0,lot.qty) });
+    pools.set(mat, lots); return lots;
+  };
+  const list = [...groups.values()];
+  // pass 1: reserve exact lots
+  for (const g of list){
+    const lots = poolFor(g.mat);
+    g.found = S.stock.has(g.mat);
+    const lot = lots.find(l => l.sloc===g.sloc && l.bk===g.bk);
+    g.exactAvail = lot ? lot.left : 0;
+    g.exactUse = Math.min(g.qty, g.exactAvail);
+    if (lot) lot.left -= g.exactUse;
+    g.short = g.qty - g.exactUse;
+  }
+  // pass 2: cover shortfalls from other lots (same location first, then other locations)
+  for (const g of list){
+    if (!g.found){ g.status = "missing"; continue; }
+    if (g.short <= 0){ g.status = "ok"; continue; }
+    const lots = poolFor(g.mat);
+    const sameLoc = lots.filter(l => l.sloc===g.sloc && l.bk!==g.bk && l.left>0).sort((a,b)=>b.left-a.left);
+    const otherLoc = lots.filter(l => l.sloc!==g.sloc && l.left>0).sort((a,b)=>(a.bk===g.bk?-1:0)-(b.bk===g.bk?-1:0) || b.left-a.left);
+    let need = g.short; const take = [];
+    let usedOtherLoc = false;
+    for (const l of [...sameLoc, ...otherLoc]){
+      if (need <= 0) break;
+      const t = Math.min(need, l.left);
+      take.push({ sloc:l.sloc, batch:l.batch, qty:t, avail:l.left });
+      if (l.sloc !== g.sloc) usedOtherLoc = true;
+      l.left -= t; need -= t;
+    }
+    g.alts = take;
+    g.altAll = [...sameLoc, ...otherLoc].map(l=>({sloc:l.sloc,batch:l.batch,left:l.left}));
+    if (need > 0){ g.status = "short"; g.missingQty = need; }
+    else g.status = usedOtherLoc ? "altloc" : "altbatch";
+  }
+  C.groups = list;
+  C.invalid = C.lines.filter(L => L.errors.length);
+  const supp = [...new Set(C.lines.map(L=>L.supplier).filter(Boolean))];
+  C.suppliers = supp;
+}
+
+const STATUS = {
+  ok:      { label:"Available",            pill:"p-ok",   sev:"ok" },
+  altbatch:{ label:"Other batch",          pill:"p-warn", sev:"warn" },
+  altloc:  { label:"Other location",       pill:"p-info", sev:"info" },
+  short:   { label:"Not enough stock",     pill:"p-bad",  sev:"bad" },
+  missing: { label:"Not in SAP stock",     pill:"p-bad",  sev:"bad" },
+  invalid: { label:"Data error",           pill:"p-bad",  sev:"bad" },
+};
+function message(g){
+  const req = fmtQ(g.qty), loc = `${g.sloc} / ${esc(g.batch)}`;
+  switch(g.status){
+    case "ok": return `Requested <b class="mono">${req}</b>, available <b class="mono">${fmtQ(g.exactAvail)}</b> in ${loc}. Remaining after this file: <b class="mono">${fmtQ(g.exactAvail - g.qty)}</b>.`;
+    case "missing": return `Material ${esc(g.mat)} is not in the SAP stock file.`;
+    case "altbatch":
+    case "altloc": {
+      const parts = [`${g.sloc}/${esc(g.batch)}: ${fmtQ(g.exactUse)}`].concat(g.alts.map(a=>`${a.sloc}/${esc(a.batch)}: ${fmtQ(a.qty)}`));
+      const head = g.status==="altbatch"
+        ? `Batch ${esc(g.batch)} has only <b class="mono">${fmtQ(g.exactAvail)}</b> of <b class="mono">${req}</b>. Same material, another batch is available in ${g.sloc}.`
+        : `${loc} has only <b class="mono">${fmtQ(g.exactAvail)}</b> of <b class="mono">${req}</b>. Quantity is satisfied by adding stock from other location(s).`;
+      return `${head}<ul class="alts"><li>${parts.map(p=>`<b>${p}</b>`).join(" + ")} = <b>${req}</b></li><li>Change the batch/location lines in the Excel to match before posting.</li></ul>`;
+    }
+    case "short": {
+      const tot = g.exactUse + g.alts.reduce((a,x)=>a+x.qty,0);
+      const others = g.alts.length ? `<ul class="alts"><li>Other stock: ${g.alts.map(a=>`<b>${a.sloc}/${esc(a.batch)}: ${fmtQ(a.qty)}</b>`).join(" + ")}</li></ul>` : "";
+      return `Quantity does not satisfy. Requested <b class="mono">${req}</b>, only <b class="mono">${fmtQ(tot)}</b> available for this material (${loc}: ${fmtQ(g.exactAvail)}). Short by <b class="mono">${fmtQ(g.missingQty)}</b>.${others}`;
+    }
+  }
+  return "";
+}
+
+let FILTER = "all";
+function renderResults(){
+  const C = S.current; const R = $("results");
+  if (!C){ R.hidden = true; return; }
+  R.hidden = false;
+  const cnt = { ok:0, altbatch:0, altloc:0, short:0, missing:0 };
+  C.groups.forEach(g => cnt[g.status]++);
+  const problems = cnt.short + cnt.missing + C.invalid.length;
+  const soft = cnt.altbatch + cnt.altloc;
+  const totalQty = C.lines.filter(l=>!l.errors.length).reduce((a,l)=>a+l.qty,0);
+  let vClass, vTitle, vText;
+  if (!problems && !soft){ vClass="ok"; vTitle="All materials available"; vText=`All ${C.groups.length} material/location/batch combinations are covered by SAP stock. The file is approved.`; }
+  else if (!problems){ vClass="warn"; vTitle="Available, with batch or location changes"; vText=`${soft} line group(s) need stock from another batch or location. Review them before posting.`; }
+  else { vClass="bad"; vTitle="Some quantities do not satisfy"; vText=`${problems} problem(s): ${cnt.short} short, ${cnt.missing} not in stock, ${C.invalid.length} data error(s).`; }
+  const supWarn = C.suppliers.length > 1 ? `<div class="notice warn">This file has ${C.suppliers.length} suppliers (${C.suppliers.map(esc).join(", ")}). Each TXT line keeps its own supplier.</div>` : "";
+
+  const tile = (k, n, l, cls) => `<button class="tile ${cls} ${FILTER===k?"active":""}" data-f="${k}"><span class="n">${n}</span><span class="l">${l}</span></button>`;
+  R.innerHTML = `
+    <div class="card">
+      <div class="verdict ${vClass}">
+        <div class="grow"><h3>${vTitle}</h3><p>${vText}</p></div>
+        <div class="facts"><span>Lines <b class="mono">${C.lines.length}</b></span><span>Total qty <b class="mono">${fmtQ(totalQty)}</b></span><span>Supplier <b class="mono">${C.suppliers.map(esc).join(", ")||"–"}</b></span></div>
+      </div>
+      ${supWarn}
+      <div class="tally">
+        ${tile("all", C.groups.length + C.invalid.length, "All", "")}
+        ${tile("ok", cnt.ok, "Available", "ok")}
+        ${tile("altbatch", cnt.altbatch, "Other batch", "warn")}
+        ${tile("altloc", cnt.altloc, "Other location", "info")}
+        ${tile("short", cnt.short + cnt.missing, "Not satisfied", "bad")}
+        ${tile("invalid", C.invalid.length, "Data errors", "bad")}
+      </div>
+      <div class="tablebox"><table>
+        <thead><tr><th>Material</th><th>Description</th><th>SLoc</th><th>Batch</th><th class="r">Excel rows</th><th class="r">Requested</th><th class="r">In batch</th><th>Status</th><th>Details</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table></div>
+      <p class="small muted">Lines with the same material, location and batch are added together before checking stock.</p>
+    </div>
+
+    <div class="card">
+      <h2>TXT output</h2>
+      <div class="row">
+        <button class="primary" id="genBtn">Generate ${esc(C.file.replace(/\.[^.]+$/,""))}.txt</button>
+        <button id="copyBtn">Copy text</button>
+        <button id="prevBtn">Show preview</button>
+      </div>
+      <div id="genArea"></div>
+      <pre class="txt" id="preview" hidden></pre>
+    </div>`;
+  R.querySelectorAll(".tile").forEach(b => b.onclick = () => { FILTER = b.dataset.f; renderResults(); });
+  renderRows();
+  $("genBtn").onclick = onGenerate;
+  $("copyBtn").onclick = () => copyText(buildTxt(exportLines("all")));
+  $("prevBtn").onclick = () => {
+    const p = $("preview"); p.hidden = !p.hidden;
+    $("prevBtn").textContent = p.hidden ? "Show preview" : "Hide preview";
+    if (!p.hidden) p.textContent = buildTxt(exportLines("all")).replace(/\r/g,"");
+  };
+}
+function renderRows(){
+  const C = S.current; const tb = $("tbody");
+  let html = "";
+  const show = s => FILTER==="all" || FILTER===s || (FILTER==="short" && (s==="short"||s==="missing"));
+  const order = { short:0, missing:0, altloc:1, altbatch:2, ok:3 };
+  if (show("invalid")) for (const L of C.invalid){
+    html += `<tr class="sev-bad"><td class="mono">${esc(L.mat)||"–"}</td><td class="desc">${esc(L.desc)}</td><td class="mono">${esc(L.sloc)}</td><td class="mono">${esc(L.batch)}</td><td class="r mono">${L.excelRow}</td><td class="r mono">${isFinite(L.qty)?fmtQ(L.qty):"–"}</td><td class="r mono">–</td>
+      <td><span class="pill p-bad">Data error</span></td><td class="msg">${L.errors.map(esc).join("<br>")}</td></tr>`;
+  }
+  const gs = C.groups.filter(g=>show(g.status)).sort((a,b)=>order[a.status]-order[b.status]);
+  for (const g of gs){
+    const st = STATUS[g.status];
+    html += `<tr class="sev-${st.sev}"><td class="mono">${esc(g.mat)}</td><td class="desc">${esc(g.desc || S.stockMeta.desc.get(g.mat) || "")}</td><td class="mono">${esc(g.sloc)}</td><td class="mono">${esc(g.batch)}</td>
+      <td class="r mono">${g.rows.join(", ")}</td><td class="r mono">${fmtQ(g.qty)}</td><td class="r mono">${g.found?fmtQ(g.exactAvail):"–"}</td>
+      <td><span class="pill ${st.pill}">${st.label}</span></td><td class="msg">${message(g)}</td></tr>`;
+  }
+  tb.innerHTML = html || `<tr><td colspan="9" class="muted">Nothing in this filter.</td></tr>`;
+}
+
+/* ---------- TXT build ---------- */
+function exportLines(mode){
+  const C = S.current;
+  if (mode === "approved"){
+    const okKeys = new Set(C.groups.filter(g=>g.status==="ok").map(g=>g.key));
+    return C.lines.filter(L => !L.errors.length && okKeys.has(L.mat+"|"+L.sloc+"|"+bkey(L.batch)));
+  }
+  return C.lines.filter(L => !L.errors.length);
+}
+function buildTxt(lines){
+  const date = ($("postDate").value || todayStr()).trim();
+  const out = lines.map((L, i) => {
+    const f = new Array(29).fill("");
+    f[0]="1"; f[1]="RTRN"; f[2]=L.supplier; f[3]=date; f[5]="RETN"; f[6]="C01"; f[7]="1000";
+    f[10]=String((i+1)*10); f[11]=L.mat; f[12]=fmtQ(L.qty); f[14]=L.plant; f[15]=L.cost.toFixed(2);
+    f[16]="SAR"; f[17]=L.sloc; f[25]="X"; f[28]=L.batch;
+    return f.join("\t");
+  });
+  return out.length ? out.join("\r\n") + "\r\n" : "";
+}
+async function copyText(t){
+  if (!t){ toast("No valid lines to copy"); return; }
+  try{ await navigator.clipboard.writeText(t); toast("TXT copied to clipboard"); }
+  catch(e){
+    const p = $("preview"); p.hidden = false; p.textContent = t.replace(/\r/g,"");
+    const range = document.createRange(); range.selectNodeContents(p);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    toast("Copy blocked here. Text is selected: press Ctrl+C / ⌘C");
+  }
+}
+function onGenerate(){
+  const C = S.current; const area = $("genArea");
+  const bad = C.groups.filter(g=>g.status!=="ok").length + C.invalid.length;
+  if (!bad) return doExport("all");
+  const approvedCount = exportLines("approved").length;
+  area.innerHTML = `<div class="confirm">
+    <p><b>${bad} group(s) are not fully approved.</b> Data-error rows are never included. Choose what to put in the TXT:</p>
+    <div class="row">
+      <button class="primary" id="exApproved" ${approvedCount?"":"disabled"}>Only approved lines (${approvedCount})</button>
+      <button id="exAll">All valid lines (${exportLines("all").length})</button>
+      <button class="link" id="exCancel">Cancel</button>
+    </div></div>`;
+  $("exApproved").onclick = () => doExport("approved");
+  $("exAll").onclick = () => doExport("all");
+  $("exCancel").onclick = () => area.innerHTML = "";
+}
+async function doExport(mode){
+  const C = S.current; const lines = exportLines(mode);
+  if (!lines.length){ toast("No valid lines to export"); return; }
+  const txt = buildTxt(lines);
+  const fname = C.file.replace(/\.[^.]+$/,"") + ".txt";
+  let saved = false;
+  try{
+    const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
+    if (dl){ await dl.save({ filename:fname, data:txt }); saved = true; }
+    else {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt],{type:"text/plain"})); a.download = fname;
+      document.body.appendChild(a); a.click(); a.remove(); saved = true;
+    }
+  }catch(e){
+    if (e && e.code === "declined"){ toast("Save cancelled. Nothing was deducted."); return; }
+    $("genArea").innerHTML = `<div class="notice warn">The file could not be saved here (${esc(e && e.message || "unavailable")}). Use "Copy text" and paste into Notepad, then save as ${esc(fname)}.</div>`;
+    return;
+  }
+  if (!saved) return;
+  // deduct from session stock
+  const deductions = [];
+  for (const L of lines){
+    const lot = getLot(L.mat, L.sloc, bkey(L.batch));
+    if (!lot) continue;
+    const take = Math.min(L.qty, Math.max(0, lot.qty));
+    lot.qty -= take; deductions.push({ mat:L.mat, sloc:L.sloc, bk:bkey(L.batch), qty:take });
+  }
+  const qty = lines.reduce((a,l)=>a+l.qty,0);
+  S.exports.push({ file:fname, source:C.file, time:new Date(), lines:lines.length, qty, mode, deductions });
+  toast(`${fname} saved. ${fmtQ(qty)} pc deducted from session stock.`);
+  renderStock(); renderLog();
+  C.already = true;
+  $("genBtn").disabled = true; $("genBtn").textContent = "Exported";
+  $("genArea").innerHTML = `<div class="notice">Exported <b>${lines.length}</b> line(s), <b class="mono">${fmtQ(qty)}</b> pc. The next Excel you upload is validated against the remaining quantities.</div>`;
+}
+
+/* ---------- log ---------- */
+function renderLog(){
+  const card = $("logCard");
+  if (!S.exports.length){ card.hidden = true; return; }
+  card.hidden = false;
+  const rows = S.exports.map((e,i)=>`<tr><td class="mono">${e.time.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</td><td>${esc(e.file)}</td><td>${e.kind==="os"?"Overstock transfer":(e.mode==="approved"?"Expiry · approved only":"Expiry · all valid")}</td><td class="r mono">${e.lines}</td><td class="r mono">${fmtQ(e.qty)}</td>
+    <td>${i===S.exports.length-1?`<button class="link" id="undoBtn">Undo deduction</button>`:""}</td></tr>`).join("");
+  $("logBody").innerHTML = `<div class="tablebox"><table><thead><tr><th>Time</th><th>TXT file</th><th>Type</th><th class="r">Lines</th><th class="r">Qty deducted</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="small muted">Deductions live only in this page. Closing or reloading it resets stock to the original 1200 file.</p>`;
+  const u = $("undoBtn");
+  if (u) u.onclick = () => {
+    const e = S.exports.pop();
+    for (const d of e.deductions){ const lot = getLot(d.mat, d.sloc, d.bk); if (lot) lot.qty += d.qty; }
+    toast(`Deduction for ${e.file} undone`);
+    renderStock(); renderLog();
+    if (S.current){ S.current.already = S.exports.some(x=>x.source===S.current.file); analyse(); renderResults(); }
+  };
+}
+
+/* ---------- overstock transfer (x204 / x208 -> goods) ---------- */
+const OS_HEAD = ["Doc Nm","Date ","Type ","Company Code ","  PURCH_ORG TYPE EKORG ,","  PUR_GROUP TYPE BKGRP ,","supplying plant ,","sl no ,","  MATERIAL TYPE N LENGTH 18 ,","  STGE_LOC TYPE LGORT_D ,","  to Where ,","  QUANTITY TYPE BSTMG ,","  PO_UNIT TYPE BSTME ,","  PO_REASON TYPE BSGRU,","  PO_BATCH TYPE CHARG_D,","destination storage location ","  supplying storage location"];
+const OS_WIDTHS = [7.86,16.86,6.71,10.14,29,12.43,30.29,10.43,35,30.29,26.71,27.86,26.71,27.86,29,35,33.86];
+const OS_NOFILL = new Set([9,13,14,16]); // J, N, O, Q have no yellow header
+const OS_CAT = { "1":"Medicine", "2":"Cosmetics", "3":"Category 3", "4":"Category 4" };
+function osRules(pl){
+  const d = pl[0];
+  return { plant:pl, goods:d+"100", src:[d+"204", d+"208"],
+    dest:{ "1":d+"110", "2":d+"120", "3":d+"130", "4":d+"140" } };
+}
+function yyyymmdd(){ const d = new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0"); }
+function osFileName(pl){ const d = new Date(); return `OS ${pl} ${String(d.getDate()).padStart(2,"0")}-${String(d.getMonth()+1).padStart(2,"0")}-${d.getFullYear()}.xlsx`; }
+const strCmp = (a,b) => a < b ? -1 : a > b ? 1 : 0;
+
+function osCollect(){
+  const R = osRules(VALID_PLANT); const lines = [], skipped = [], notDummy = [];
+  for (const [mat, m] of S.stock){
+    for (const src of R.src){
+      const s = m.get(src); if (!s) continue;
+      for (const [bk, lot] of s){
+        if (!(lot.qty > 0)) continue;
+        const dg = mat[0];
+        const L = { mat, bk, batch:lot.batch, src, qty:lot.qty, desc:S.stockMeta.desc.get(mat)||"" };
+        if (!R.dest[dg]){ skipped.push(L); continue; }
+        L.doc = Number(dg); L.dest = R.dest[dg]; L.grp = dg==="1" ? "INM" : "INC";
+        // medicine (1) moves only with a real batch; 2/3/4 move only with batch DUMMY
+        if (dg === "1" ? bk === "DUMMY" : bk !== "DUMMY"){ L.reason = dg === "1" ? "Medicine with DUMMY batch" : "Batch not DUMMY"; notDummy.push(L); continue; }
+        lines.push(L);
+      }
+    }
+  }
+  lines.sort((a,b) => a.doc-b.doc || strCmp(a.mat,b.mat) || strCmp(a.batch,b.batch) || strCmp(a.src,b.src));
+  const seq = {};
+  lines.forEach(L => { seq[L.doc] = (seq[L.doc]||0) + 10; L.sl = seq[L.doc]; });
+  notDummy.sort((a,b) => a.doc-b.doc || strCmp(a.mat,b.mat) || strCmp(a.batch,b.batch));
+  return { R, lines, skipped, notDummy };
+}
+
+let OS_FILTER = "all";
+function renderOS(){
+  const card = $("osCard"), badge = $("osBadge");
+  if (!S.stock){ badge.textContent = "–"; badge.className = "badge"; return; }
+  const { R, lines, skipped, notDummy } = osCollect();
+  const ndName = osFileName(R.plant).replace(/\.xlsx$/, " - Batch exceptions.xlsx");
+  const ndQty = notDummy.reduce((a,l)=>a+l.qty,0);
+  const ndHtml = !notDummy.length ? "" : `<div class="confirm" style="border-color:var(--bad);background:var(--bad-soft)">
+      <p><b>Batch exceptions · ${notDummy.length} line(s), ${fmtQ(ndQty)} pc kept out of the transfer.</b> Medicine (1xxxxx) moves only with a real batch, never DUMMY. Materials 2, 3 and 4 move only with batch DUMMY.</p>
+      <div class="facts"><span>Medicine with DUMMY batch <b class="mono">${notDummy.filter(l=>l.doc===1).length}</b></span><span>2/3/4 batch not DUMMY <b class="mono">${notDummy.filter(l=>l.doc!==1).length}</b></span><span>These stay in <b class="mono">${[...new Set(notDummy.map(l=>l.src))].join(", ")}</b></span></div>
+      <div class="row"><button id="ndDl">Download ${esc(ndName)}</button></div>
+      <div class="tablebox" style="max-height:260px;overflow:auto"><table>
+        <thead><tr><th>Material</th><th>Description</th><th>SLoc</th><th>Batch</th><th class="r">Qty</th><th>Reason</th></tr></thead>
+        <tbody>${notDummy.map(l=>`<tr class="sev-bad"><td class="mono">${esc(l.mat)}</td><td class="desc">${esc(l.desc)}</td><td class="mono">${l.src}</td><td class="mono">${esc(l.batch)}</td><td class="r mono">${fmtQ(l.qty)}</td><td>${l.reason}</td></tr>`).join("")}</tbody>
+      </table></div></div>`;
+  const wireNd = () => { const b = $("ndDl"); if (b) b.onclick = async () => {
+    try{ await saveFile(ndName, new Blob([ndWorkbook(notDummy, R)])); toast(ndName+" saved"); }
+    catch(e){ if (!(e && e.code==="declined")) toast("Could not save the file here"); } }; };
+  const qty = lines.reduce((a,l)=>a+l.qty,0);
+  badge.textContent = lines.length ? lines.length.toLocaleString() : "0";
+  badge.className = "badge" + (lines.length ? " hot" : "");
+  const docs = [1,2,3,4].map(d => {
+    const ls = lines.filter(l=>l.doc===d);
+    return { d, n:ls.length, q:ls.reduce((a,l)=>a+l.qty,0), mats:new Set(ls.map(l=>l.mat)).size, src:[...new Set(ls.map(l=>l.src))].sort().join(", ") };
+  });
+  const fname = osFileName(R.plant);
+  const last = S.lastOS ? `<div class="notice">Last transfer: <b>${esc(S.lastOS.fname)}</b> · ${S.lastOS.lines} lines · <span class="mono">${fmtQ(S.lastOS.qty)}</span> pc. <button class="link" id="osRedl">Download again</button></div>` : "";
+  if (!lines.length){
+    card.innerHTML = `<h2>Overstock transfer · plant ${R.plant} ${PLANTS[R.plant]}</h2>
+      <div class="verdict ok"><div class="grow"><h3>No overstock to transfer</h3><p>${notDummy.length ? `Only batch exceptions are left in ${R.src.join(" and ")}. They are not transferred.` : `Storage locations ${R.src.join(" and ")} have no stock left in ${esc(S.stockMeta.file)}.`}</p></div></div>
+      ${ndHtml}${skippedNote(skipped)}${last}`;
+    wireRedl(); wireNd(); return;
+  }
+  const show = l => OS_FILTER==="all" || String(l.doc)===OS_FILTER;
+  const rowsHtml = lines.filter(show).map(l => `<tr><td class="mono">${l.doc}</td><td class="r mono">${l.sl}</td><td class="mono">${esc(l.mat)}</td><td class="desc">${esc(l.desc)}</td><td class="mono">${esc(l.batch)}</td><td class="r mono">${fmtQ(l.qty)}</td><td class="route">${l.src}<span class="arr">→</span>${R.goods} / ${l.dest}</td><td class="mono">${l.grp}</td></tr>`).join("");
+  const tile = (k,n,l,cls) => `<button class="tile ${cls} ${OS_FILTER===k?"active":""}" data-of="${k}"><span class="n">${n}</span><span class="l">${l}</span></button>`;
+  card.innerHTML = `<h2>Overstock transfer · plant ${R.plant} ${PLANTS[R.plant]}</h2>
+    <div class="verdict warn">
+      <div class="grow"><h3>${lines.length.toLocaleString()} lines · ${fmtQ(qty)} pc in overstock</h3>
+      <p>Found in ${R.src.join(" and ")}${notDummy.length?` (excluding ${notDummy.length} batch exception line(s))`:""}. Transfer to goods ${R.goods}?</p></div>
+      <div class="row"><button class="primary" id="osAsk">Approve transfer</button></div>
+    </div>
+    <div id="osConfirm"></div>
+    ${last}
+    <div class="tablebox"><table>
+      <thead><tr><th>Doc</th><th>Starts with</th><th>Type</th><th>Transfer</th><th>Pur. group</th><th class="r">Materials</th><th class="r">Lines</th><th class="r">Qty</th></tr></thead>
+      <tbody>${docs.map(x=>`<tr><td class="mono">${x.d}</td><td class="mono">${x.d}xxxxx</td><td>${OS_CAT[x.d]}</td><td class="route">${x.src||"–"}<span class="arr">→</span>${R.goods} / ${R.dest[x.d]}</td><td class="mono">${x.d===1?"INM":"INC"}</td><td class="r mono">${x.mats}</td><td class="r mono">${x.n}</td><td class="r mono">${fmtQ(x.q)}</td></tr>`).join("")}
+      <tr><td></td><td colspan="4"><b>Total</b></td><td class="r mono"><b>${new Set(lines.map(l=>l.mat)).size}</b></td><td class="r mono"><b>${lines.length}</b></td><td class="r mono"><b>${fmtQ(qty)}</b></td></tr></tbody>
+    </table></div>
+    ${ndHtml}
+    ${skippedNote(skipped)}
+    <div class="tally" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+      ${tile("all", lines.length, "All", "")}${[1,2,3,4].map(d=>tile(String(d), docs[d-1].n, "Doc "+d+" · "+R.dest[d], "")).join("")}
+    </div>
+    <div class="tablebox tall"><table>
+      <thead><tr><th>Doc</th><th class="r">Sl no</th><th>Material</th><th>Description</th><th>Batch</th><th class="r">Qty</th><th>From → To</th><th>Group</th></tr></thead>
+      <tbody>${rowsHtml || `<tr><td colspan="8" class="muted">Nothing in this document.</td></tr>`}</tbody>
+    </table></div>
+    <p class="small muted">Output follows the MED OS upload format. File name: <b>${esc(fname)}</b>. Date column: <span class="mono">${yyyymmdd()}</span>.</p>`;
+  card.querySelectorAll("[data-of]").forEach(b => b.onclick = () => { OS_FILTER = b.dataset.of; renderOS(); });
+  $("osAsk").onclick = () => {
+    $("osConfirm").innerHTML = `<div class="confirm">
+      <p><b>Transfer ${lines.length.toLocaleString()} lines (${fmtQ(qty)} pc)</b> from ${R.src.join(" / ")} to goods ${R.goods}: ${[1,2,3,4].filter(d=>docs[d-1].n).map(d=>`${R.dest[d]} (${docs[d-1].n})`).join(", ")}.</p>
+      <p class="small">Approving downloads <b>${esc(fname)}</b>${notDummy.length?` and then <b>${esc(ndName)}</b> (${notDummy.length} line(s))`:""}, and removes the transferred quantities from the session stock.</p>
+      <div class="row"><button class="primary" id="osYes">Approve and download</button><button class="link" id="osNo">Cancel</button></div></div>`;
+    $("osYes").onclick = () => osExport(lines, R, fname, notDummy, ndName);
+    $("osNo").onclick = () => $("osConfirm").innerHTML = "";
+  };
+  wireRedl(); wireNd();
+}
+function skippedNote(sk){
+  if (!sk.length) return "";
+  return `<div class="notice warn">${sk.length} overstock line(s) were left out because the material does not start with 1–4: ${sk.slice(0,8).map(l=>`${esc(l.mat)} (${l.src}, ${fmtQ(l.qty)})`).join(", ")}${sk.length>8?"…":""}</div>`;
+}
+function wireRedl(){ const b = $("osRedl"); if (b) b.onclick = () => saveFile(S.lastOS.fname, new Blob([S.lastOS.data])); }
+
+function osWorkbook(lines, R){
+  const date = Number(yyyymmdd());
+  const headStyle = i => ({ font:{ name:"Courier New", sz:10 }, alignment:{ horizontal:"left" },
+    ...(OS_NOFILL.has(i) ? {} : { fill:{ patternType:"solid", fgColor:{ rgb:"FFFF00" } } }) });
+  const ws = {};
+  OS_HEAD.forEach((h,i) => { ws[XLSX.utils.encode_cell({r:0,c:i})] = { t:"s", v:h, s:headStyle(i) }; });
+  const num = v => { const n = Number(v); return isFinite(n) && String(v).trim() !== "" ? n : null; };
+  lines.forEach((L, k) => {
+    const r = k+1;
+    const vals = [
+      {t:"n",v:L.doc}, {t:"n",v:date}, {t:"s",v:"ZTDD"}, {t:"n",v:1000}, {t:"s",v:"INT"}, {t:"s",v:L.grp},
+      {t:"n",v:Number(R.plant)}, {t:"n",v:L.sl,s:{numFmt:"00000;-00000"}},
+      num(L.mat)!==null ? {t:"n",v:num(L.mat),s:{numFmt:"000000000000000000;-000000000000000000"}} : {t:"s",v:L.mat},
+      null, {t:"n",v:Number(R.goods)}, {t:"n",v:L.qty,z:"#,##0",s:{numFmt:"#,##0"}}, {t:"s",v:"EA"}, null,
+      {t:"s",v:String(L.batch)}, {t:"n",v:Number(L.dest)}, {t:"n",v:Number(L.src)}
+    ];
+    vals.forEach((c,i) => { if (c) ws[XLSX.utils.encode_cell({r,c:i})] = c; });
+  });
+  ws["!ref"] = XLSX.utils.encode_range({ s:{r:0,c:0}, e:{ r:lines.length, c:OS_HEAD.length-1 } });
+  ws["!cols"] = OS_WIDTHS.map(w => ({ width:w }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+  return XLSX.write(wb, { bookType:"xlsx", type:"array" });
+}
+async function saveFile(fname, blob){
+  const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
+  if (dl) { await dl.save({ filename:fname, data:blob }); return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fname;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+}
+function ndSheet(list, R){
+  const head = ["Material","Material Description","Plant","Storage Location","Batch","Quantity","Would go to","Reason"];
+  const hs = { font:{ name:"Courier New", sz:10, bold:true }, alignment:{ horizontal:"left" }, fill:{ patternType:"solid", fgColor:{ rgb:"FFFF00" } } };
+  const ws = {};
+  head.forEach((h,i) => { ws[XLSX.utils.encode_cell({r:0,c:i})] = { t:"s", v:h, s:hs }; });
+  list.forEach((L,k) => {
+    const n = Number(L.mat);
+    [ isFinite(n) ? {t:"n",v:n} : {t:"s",v:L.mat}, {t:"s",v:L.desc}, {t:"n",v:Number(R.plant)}, {t:"n",v:Number(L.src)},
+      {t:"s",v:String(L.batch)}, {t:"n",v:L.qty,s:{numFmt:"#,##0"}}, {t:"s",v:R.goods+" / "+L.dest}, {t:"s",v:L.reason} ]
+      .forEach((c,i) => { ws[XLSX.utils.encode_cell({r:k+1,c:i})] = c; });
+  });
+  const tr = list.length+1;
+  ws[XLSX.utils.encode_cell({r:tr,c:4})] = { t:"s", v:"Total", s:{ font:{ bold:true } } };
+  ws[XLSX.utils.encode_cell({r:tr,c:5})] = { t:"n", v:list.reduce((a,l)=>a+l.qty,0), s:{ font:{ bold:true }, numFmt:"#,##0" } };
+  ws["!ref"] = XLSX.utils.encode_range({ s:{r:0,c:0}, e:{ r:tr, c:head.length-1 } });
+  ws["!cols"] = [12,42,8,16,16,10,14,26].map(w => ({ width:w }));
+  return ws;
+}
+function ndWorkbook(list, R){
+  const wb = XLSX.utils.book_new();
+  const med = list.filter(l => l.doc === 1), oth = list.filter(l => l.doc !== 1);
+  if (med.length) XLSX.utils.book_append_sheet(wb, ndSheet(med, R), "Medicine DUMMY batch");
+  if (oth.length) XLSX.utils.book_append_sheet(wb, ndSheet(oth, R), "Batch not DUMMY");
+  return XLSX.write(wb, { bookType:"xlsx", type:"array" });
+}
+async function osExport(lines, R, fname, notDummy, ndName){
+  let data;
+  try{ data = osWorkbook(lines, R); }catch(e){ $("osConfirm").innerHTML = `<div class="notice bad">Could not build the Excel file: ${esc(e.message)}</div>`; return; }
+  try{ await saveFile(fname, new Blob([data], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })); }
+  catch(e){
+    if (e && e.code === "declined"){ toast("Save cancelled. Nothing was transferred."); return; }
+    $("osConfirm").innerHTML = `<div class="notice bad">The file could not be saved here (${esc(e && e.message || "unavailable")}).</div>`; return;
+  }
+  const deductions = [];
+  for (const L of lines){ const lot = getLot(L.mat, L.src, L.bk); if (!lot) continue; const t = Math.max(0, Math.min(L.qty, lot.qty)); lot.qty -= t; deductions.push({ mat:L.mat, sloc:L.src, bk:L.bk, qty:t }); }
+  const qty = lines.reduce((a,l)=>a+l.qty,0);
+  S.exports.push({ kind:"os", file:fname, source:"OS", time:new Date(), lines:lines.length, qty, deductions });
+  S.lastOS = { fname, data, lines:lines.length, qty };
+  if (notDummy && notDummy.length){
+    try{ await saveFile(ndName, new Blob([ndWorkbook(notDummy, R)])); }
+    catch(e){ toast("Batch exceptions file was not saved. Use its download button."); }
+  }
+  toast(`${fname} saved. ${lines.length} lines moved to goods ${R.goods}.`);
+  renderStock(); renderLog();
+}
+function setTab(t){
+  $("tabExp").hidden = t !== "exp"; $("tabOs").hidden = t !== "os";
+  $("tabExpBtn").setAttribute("aria-selected", t==="exp"); $("tabOsBtn").setAttribute("aria-selected", t==="os");
+  try{ localStorage.setItem("efb-tab", t); }catch(e){}
+}
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+try{ const t = localStorage.getItem("efb-tab"); if (t === "os") setTab("os"); }catch(e){}
+
+/* ---------- init ---------- */
+$("postDate").value = todayStr();
+$("postDate").addEventListener("input", () => { const p = $("preview"); if (p && !p.hidden && S.current) p.textContent = buildTxt(exportLines("all")).replace(/\r/g,""); });
+wireDrop($("stockDrop"), $("stockInput"), loadStock);
+wireDrop($("retDrop"), $("retInput"), loadReturn);
+window.addEventListener("beforeunload", e => { if (S.exports.length){ e.preventDefault(); e.returnValue = ""; } });
+if (typeof XLSX === "undefined") $("stockInfo").innerHTML = `<div class="notice bad">The Excel reader failed to load. Keep the lib folder next to this HTML file, then reload.</div>`;
+})();
+</script>
+
+</body>
+</html>
